@@ -1,10 +1,11 @@
 package main
 
 import (
-	"fmt"
-	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 	"github.com/joho/godotenv"
+	"go-vocab-bot/internal/infrastructure/translation"
 	"go-vocab-bot/internal/storage"
+	"go-vocab-bot/internal/telegram"
+	"go-vocab-bot/internal/usecase"
 	"log"
 	"os"
 )
@@ -12,7 +13,7 @@ import (
 func main() {
 	err := godotenv.Load("config/.env")
 	if err != nil {
-		log.Fatal(err)
+		log.Fatal("error load .env file:", err)
 	}
 
 	token := os.Getenv("TELEGRAM_TOKEN")
@@ -20,16 +21,22 @@ func main() {
 		log.Fatal("TELEGRAM_TOKEN не найдет в .env")
 	}
 
-	bot, err := tgbotapi.NewBotAPI(token)
-	if err != nil {
-		log.Panic(err)
-	}
-	log.Print("Запущен бот:", bot.Self.UserName)
+	translator := translation.NewTranslator()
 
-	rep, err := storage.NewJSONrep("internal/storage/words.json")
+	rep, err := storage.InitRepository()
 	if err != nil {
-		log.Panic(err)
+		log.Fatalf("error init repository: %v", err)
 	}
-	fmt.Println(rep)
+
+	wordUC := usecase.NewWordUseCase(rep, translator)
+
+	tgbot, err := telegram.NewBot(token, wordUC)
+	if err != nil {
+		log.Fatal("error init bot:", err)
+	}
+
+	if err := tgbot.Start(); err != nil {
+		log.Fatal("error start bot:", err)
+	}
 
 }
